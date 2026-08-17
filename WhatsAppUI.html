@@ -1,0 +1,101 @@
+<script>
+/* ==========================================================
+   WhatsApp Bulk Queue (Safe in separate file)
+========================================================== */
+
+var _bulkQueue = [];
+var _bulkIndex = 0;
+
+function launchBulkQueue(messages) {
+    _bulkQueue = messages || [];
+    _bulkIndex = 0;
+    renderBulkQueue();
+}
+
+function renderBulkQueue() {
+    if (_bulkIndex >= _bulkQueue.length) {
+        // End of queue
+        showNotification("🎉 All messages dispatched!", "success");
+        screen('communication');
+        return;
+    }
+
+    var current = _bulkQueue[_bulkIndex];
+    var total = _bulkQueue.length;
+    var currentNum = _bulkIndex + 1;
+
+    var phone = current.phone ? current.phone.replace(/\D/g, '') : '';
+    var message = current.message || '';
+
+    render(`
+        <div class="studentsPage">
+            <div class="pageHero" style="background:#F8FAFC;">
+                <div class="pageTopBar">
+                    <div class="pageTitle">Dispatch Queue</div>
+                    <span class="material-icons pointer" onclick="_bulkQueue = []; screen('communication')">close</span>
+                </div>
+                <div class="pageHeading">Sending to ${current.studentName || 'Student'}</div>
+                <div class="pageSubHeading">${currentNum} of ${total}</div>
+            </div>
+
+            <div class="pageContent pagePadding" style="text-align:center;">
+                
+                <div class="actionCard" style="text-align:left; margin-bottom:20px; border: 2px dashed #25D366; background:#F0FDF4;">
+                    <div style="font-size:12px; font-weight:700; color:#16A34A; text-transform:uppercase; margin-bottom:4px;">📋 Message Preview</div>
+                    <pre style="white-space:pre-wrap; font-family:inherit; font-size:14px; color:#1E293B; margin:0; line-height:1.6;">${message}</pre>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <button class="primaryButton" style="width:100%; background:#25D366;" onclick="copyCurrentMessage()">
+                        📋 Send Now
+                    </button>
+                    <button class="primaryButton" style="width:100%; background:#2563EB;" onclick="nextBulkItem()">
+                        ➡️ Next Student (${currentNum}/${total})
+                    </button>
+                    <div style="font-size:12px; color:#6B7280; margin-top:4px;">
+                        Phone: ${phone || 'N/A'}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    `);
+    bottomNavigation("more");
+}
+
+function nextBulkItem() {
+    _bulkIndex++;
+    renderBulkQueue();
+}
+
+function copyCurrentMessage() {
+    if (!_bulkQueue[_bulkIndex]) return;
+    
+    var current = _bulkQueue[_bulkIndex];
+    var phone = current.phone ? current.phone.replace(/\D/g, '') : '';
+    var message = current.message || '';
+
+    // If we have a phone number, open WhatsApp with the message pre-filled
+    if (phone) {
+        // Encode the message so special characters don't break the URL
+        var encodedMessage = encodeURIComponent(message);
+        window.open("https://wa.me/" + phone + "?text=" + encodedMessage, "_blank");
+    } else {
+        // Fallback if no phone number is saved (copy to clipboard instead)
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(message).then(function() {
+                showNotification("No phone number saved. Message copied to clipboard!", "warning");
+            });
+        } else {
+            // Super old browser fallback
+            var tempInput = document.createElement("input");
+            tempInput.value = message;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            showNotification("No phone number saved. Message copied to clipboard!", "warning");
+        }
+    }
+}
+</script>

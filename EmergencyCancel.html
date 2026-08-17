@@ -1,0 +1,116 @@
+<script>
+/* ==========================================================
+   Standalone Emergency Cancel Module
+========================================================== */
+
+function renderPopup(html) {
+    var popup = document.getElementById("popupContainer");
+    if (!popup) return;
+    
+    popup.innerHTML = html;
+    popup.style.display = 'flex';
+    popup.style.alignItems = 'flex-end';
+    popup.style.justifyContent = 'center';
+    popup.style.position = 'fixed';
+    popup.style.top = '0';
+    popup.style.left = '0';
+    popup.style.right = '0';
+    popup.style.bottom = '0';
+    popup.style.width = '100%';
+    popup.style.height = '100%';
+    popup.style.zIndex = '99999';
+    popup.style.background = 'rgba(0,0,0,0.5)';
+    popup.style.backdropFilter = 'blur(4px)';
+    popup.style.pointerEvents = 'auto';
+    popup.classList.add('active');
+}
+
+function closePopup() {
+    var popup = document.getElementById("popupContainer");
+    if (!popup) return;
+    
+    popup.innerHTML = '';
+    popup.style.display = 'none';
+    popup.classList.remove('active');
+}
+
+function triggerEmergencyCancel() {
+    var todayStr = new Date().toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+
+    renderPopup(`
+        <div style="display:flex; align-items:flex-end; justify-content:center; padding:0; width:100%; height:100%; bottom:0;">
+            <div onclick="event.stopPropagation()" 
+                 style="width: 100%; max-width: 500px; padding: 24px 20px 32px 20px; border-radius: 28px 28px 0 0; text-align: left; background: #FFFFFF; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); margin: 0 auto; max-height: 85vh; overflow-y: auto; position: relative;">
+                
+                <div style="width: 40px; height: 4px; background: #D1D5DB; border-radius: 99px; margin: 0 auto 16px auto;"></div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="font-size: 18px; font-weight: 800; color: #DC2626;">🚨 Cancel All Classes Today</div>
+                    <span onclick="closePopup()" style="color: #9CA3AF; font-size: 24px; cursor: pointer;">✕</span>
+                </div>
+                
+                <div style="font-size: 13px; color: #4B5563; margin-bottom: 16px; line-height: 1.5;">
+                    This will flag all scheduled sessions for <b>${todayStr}</b> as <i>Cancelled</i> and open the notification manager.
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="font-size: 12px; font-weight: 700; color: #374151; display: block; margin-bottom: 4px;">Select Cancellation Reason</label>
+                    <select id="emergencyReasonSelect" style="width: 100%; padding: 14px; border: 1.5px solid #D1D5DB; border-radius: 12px; font-size: 14px; outline: none; background: white; color: #111827;">
+                        <option value="Teacher Unwell / Sick Leave">🤒 Teacher Unwell / Sick Leave</option>
+                        <option value="Personal Emergency">🚨 Personal Emergency</option>
+                        <option value="Unforeseen Circumstances">📌 Unforeseen Circumstances</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 24px;">
+                    <label style="font-size: 12px; font-weight: 700; color: #374151; display: block; margin-bottom: 4px;">Makeup Info / Notes (Optional)</label>
+                    <input id="emergencyCustomNote" type="text" placeholder="e.g. Makeup class on Saturday at 4 PM" style="width: 100%; padding: 14px; border: 1.5px solid #D1D5DB; border-radius: 12px; font-size: 14px; outline: none; background: white; color: #111827;">
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="closePopup()" style="flex: 1; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 600; border: 1.5px solid #D1D5DB; background: white; color: #374151; cursor: pointer;">Back</button>
+                    <button onclick="executeEmergencyCancel()" style="flex: 1.3; background: #DC2626; border: none; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 700; color: white; cursor: pointer; box-shadow: 0 4px 12px rgba(220,38,38,0.3);">Cancel & Notify</button>
+                </div>
+
+            </div>
+        </div>
+    `);
+}
+
+function executeEmergencyCancel() {
+    var reasonSelect = document.getElementById("emergencyReasonSelect");
+    var reason = reasonSelect ? reasonSelect.value : "Teacher Unwell / Sick Leave";
+    var noteInput = document.getElementById("emergencyCustomNote");
+    var note = noteInput ? noteInput.value.trim() : "";
+    var dateIso = new Date().toISOString().split('T')[0];
+    var dateDisplay = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+    var fullReason = note ? reason + " — " + note : reason;
+
+    closePopup();
+    parent.showNotification("Updating class logs...", "info");
+
+    var defaultMsg = "Bonjour parents & students,\n\nPlease note that all Language Wonder French classes scheduled for today (" + dateDisplay + ") have been CANCELLED due to " + fullReason + ".\n\nMerci for your understanding! 🙏\n— Language Wonder";
+
+    // Call parent function to show the broadcast screen
+    if (typeof parent.showEmergencyBroadcastHub === 'function') {
+        parent.showEmergencyBroadcastHub(dateDisplay, defaultMsg);
+    } else {
+        parent.showNotification("Broadcast hub missing. Classes logged.", "success");
+    }
+
+    google.script.run
+        .withSuccessHandler(function() {
+            parent.showNotification("Classes logged as Cancelled ✓", "success");
+        })
+        .withFailureHandler(function(err) {
+            console.error(err);
+            parent.showNotification(err?.message || "Failed to update server records.", "error");
+        })
+        .cancelAllClassesForDate(dateIso, fullReason);
+}
+</script>
